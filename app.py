@@ -20,6 +20,13 @@ ADMIN_PASSWORD = os.environ.get('ADMIN_PASSWORD', 'admin123')
 GAME_PASSWORD = os.environ.get('GAME_PASSWORD', 'game123')
 UPLOAD_FOLDER = os.environ.get('UPLOAD_FOLDER', os.path.join(app.root_path, 'static', 'uploads'))
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+SUPABASE_URL = os.environ.get("SUPABASE_URL")
+SUPABASE_SERVICE_KEY = os.environ.get("SUPABASE_SERVICE_KEY")
+SUPABASE_BUCKET = os.environ.get("SUPABASE_BUCKET", "uploads")
+
+supabase_client = None
+if SUPABASE_URL and SUPABASE_SERVICE_KEY:
+    supabase_client = create_client(SUPABASE_URL, SUPABASE_SERVICE_KEY)
 
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'webp', 'gif'}
 ROUNDS = [6, 6, 5]
