@@ -1,0 +1,103 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<section class="card">
+  <h2>{{game.title}}</h2>
+
+  <p class="muted">Інвайт для гравців:</p>
+  <div class="invite">{{invite}}</div>
+
+  <div class="actions">
+    <a class="button secondary" href="/admin">Назад</a>
+
+    <form method="post"
+          action="/admin/game/{{game.id}}/delete"
+          onsubmit="return confirm('Точно видалити цю гру? Це не можна буде скасувати.');">
+      <button class="danger">🗑 Видалити гру</button>
+    </form>
+
+    <a class="button secondary" href="/host/logout">Вийти</a>
+  </div>
+</section>
+
+{% if not questions %}
+<section class="card">
+  <h2>Додай всі питання одразу</h2>
+
+  <form method="post" action="/admin/game/{{game.id}}/questions" enctype="multipart/form-data">
+    {% for i in range(17) %}
+      <div class="qedit">
+        <h3>
+          Питання {{i+1}}
+          {% if i>=12 %}
+            <small>3 раунд, можна фото</small>
+          {% endif %}
+        </h3>
+
+        <textarea name="q_{{i}}" placeholder="Питання"></textarea>
+        <input name="c_{{i}}" placeholder="Правильна відповідь">
+        <input name="f_{{i}}" placeholder="Фейк ведучої">
+
+        {% if i>=12 %}
+          <label class="fileLabel">
+            Фото до питання з пристрою
+            <input
+              type="file"
+              name="pfile_{{i}}"
+              accept="image/*"
+              class="questionPhotoInput"
+              data-preview="preview_{{i}}"
+            >
+          </label>
+
+          <input name="p_{{i}}" placeholder="Або посилання на фото, якщо зручніше">
+
+          <div class="photoPreviewBox hidden" id="preview_{{i}}_box">
+            <p class="muted">Попередній перегляд фото:</p>
+            <img id="preview_{{i}}" class="questionPhotoPreview" alt="Попередній перегляд">
+          </div>
+        {% endif %}
+      </div>
+    {% endfor %}
+
+    <button>Зберегти питання і запустити гру</button>
+  </form>
+</section>
+{% else %}
+<main class="grid">
+  <section class="card">
+    <div id="adminState">Завантаження...</div>
+  </section>
+
+  <aside class="card">
+    <h2>Таблиця</h2>
+    <div id="scoreBoard"></div>
+  </aside>
+</main>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.querySelectorAll('.questionPhotoInput').forEach((input) => {
+  input.addEventListener('change', () => {
+    const file = input.files && input.files[0];
+    const previewId = input.dataset.preview;
+    const img = document.getElementById(previewId);
+    const box = document.getElementById(previewId + '_box');
+
+    if (!file || !img || !box) return;
+
+    img.src = URL.createObjectURL(file);
+    box.classList.remove('hidden');
+  });
+});
+</script>
+
+{% if questions %}
+<script>
+window.GAME_ID = {{game.id}};
+</script>
+<script src="/static/admin.js"></script>
+{% endif %}
+{% endblock %}
