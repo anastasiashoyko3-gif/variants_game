@@ -6,6 +6,12 @@ let poll = null;
 async function api(force = false) {
   try {
     const r = await fetch('/api/state/' + window.INVITE_CODE, {cache: 'no-store'});
+
+    if (!r.ok) {
+      console.log('Server error:', r.status);
+      return;
+    }
+
     const s = await r.json();
     last = s;
     render(s, force);
