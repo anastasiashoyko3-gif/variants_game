@@ -68,6 +68,48 @@ def save_upload(file):
     filename = f"{secrets.token_urlsafe(16)}.{ext}"
     file_path = f"uploads/{filename}"
 
+    if SUPABASE_URL and SUPABASE_SERVICE_KEY:
+        file_bytes = file.read()
+        content_type = file.content_type or "application/octet-stream"
+
+        upload_url = f"{SUPABASE_URL}/storage/v1/object/{SUPABASE_BUCKET}/{file_path}"
+
+        response = requests.post(
+            upload_url,
+            headers={
+                "apikey": SUPABASE_SERVICE_KEY,
+                "Authorization": f"Bearer {SUPABASE_SERVICE_KEY}",
+                "Content-Type": content_type,
+                "x-upsert": "true",
+            },
+            data=file_bytes,
+            timeout=30,
+        )
+
+        if response.status_code not in (200, 201):
+            print("Supabase upload error:", response.status_code, response.text)
+            return ""
+
+        return f"{SUPABASE_URL}/storage/v1/object/public/{SUPABASE_BUCKET}/{file_path}"
+
+    local_path = os.path.join(UPLOAD_FOLDER, filename)
+    file.save(local_path)
+
+    return url_for("static", filename=f"uploads/{filename}")
+
+    name = secure_filename(file.filename)
+
+    if not name or "." not in name:
+        return ""
+
+    ext = name.rsplit(".", 1)[1].lower()
+
+    if ext not in ALLOWED_EXTENSIONS:
+        return ""
+
+    filename = f"{secrets.token_urlsafe(16)}.{ext}"
+    file_path = f"uploads/{filename}"
+
     if supabase_client:
         file_bytes = file.read()
 
