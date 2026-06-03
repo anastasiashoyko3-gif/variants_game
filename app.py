@@ -321,20 +321,22 @@ def save_or_update_questions(game_id, reset_progress=True):
             )
             order += 1
 
-   if reset_progress:
-    conn.execute(
-        """
-        UPDATE games
-        SET current_q=0,
-            phase='lobby',
-            status='active',
-            answer_deadline=NULL,
-            vote_deadline=NULL,
-            scoreboard_visible=0
-        WHERE id=%s
-        """,
-        (game_id,)
-    )
+       if reset_progress:
+        conn.execute(
+            """
+            UPDATE games
+            SET current_q=0,
+                phase='lobby',
+                status='active',
+                answer_deadline=NULL,
+                vote_deadline=NULL,
+                scoreboard_visible=0
+            WHERE id=%s
+            """,
+            (game_id,)
+        )
+
+    conn.commit()
 
     conn.commit()
 
