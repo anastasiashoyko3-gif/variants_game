@@ -449,8 +449,63 @@ def play_home():
 @app.route('/invite/<code>', methods=['GET', 'POST'])
 def invite(code):
     game = get_game_by_code(code)
+
     if not game:
-        return render_template('message.html', title='Гри немає', text='Такого інвайту не існує.')
+        return render_template(
+            'message.html',
+            title='Гри немає',
+            text='Такого інвайту не існує.'
+        )
+
+    if request.method == 'POST':
+        if request.form.get('game_password') != GAME_PASSWORD:
+            return render_template(
+                'invite.html',
+                game=game,
+                error='Неправильний пароль гри'
+            )
+
+        name = request.form.get('name', '').strip()
+        pin = request.form.get('pin', '').strip()
+
+        if not name:
+            return render_template(
+                'invite.html',
+                game=game,
+                error='Введи імʼя'
+            )
+
+        if not pin:
+            return render_template(
+                'invite.html',
+                game=game,
+                error='Введи PIN-код'
+            )
+
+        existing = db().execute(
+            'SELECT * FROM players WHERE game_id=? AND lower(name)=lower(?) AND pin=? LIMIT 1',
+            (game['id'], name, pin)
+        ).fetchone()
+
+        if existing:
+            session[f'player_{game["id"]}'] = existing['id']
+            return redirect(url_for('game_play', code=code))
+
+        avatar = save_upload(request.files.get('avatar_file')) or request.form.get('avatar', '').strip()
+
+        cur = db().execute(
+            'INSERT INTO players(game_id,name,avatar,pin,created_at) VALUES(?,?,?,?,?) RETURNING id',
+            (game['id'], name, avatar, pin, datetime.now().strftime('%H:%M'))
+        )
+
+        db().commit()
+
+        new_player = cur.fetchone()
+        session[f'player_{game["id"]}'] = new_player['id']
+
+        return redirect(url_for('game_play', code=code))
+
+    return render_template('invite.html', game=game)
 
     if request.method == 'POST':
         if request.form.get('game_password') != GAME_PASSWORD:
