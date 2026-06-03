@@ -391,6 +391,11 @@ def api_vote(code):
     if game['phase'] != 'voting':
         return jsonify({'ok': False, 'message': 'Зараз не голосування'})
 
+    now = int(time.time())
+
+    if game['vote_deadline'] and now >= int(game['vote_deadline']):
+        return jsonify({'ok': False, 'message': 'Час голосування вийшов'})
+
     q = get_current_question(game)
     if not q:
         return jsonify({'ok': False})
@@ -404,7 +409,6 @@ def api_vote(code):
     if not chosen:
         return jsonify({'ok': False, 'message': 'Такого варіанту немає'})
 
-    # Заборона голосувати за свою відповідь
     if chosen.get('type') == 'player' and int(chosen.get('player_id') or 0) == int(pid):
         return jsonify({'ok': False, 'message': 'Не можна голосувати за свою відповідь'})
 
@@ -415,7 +419,6 @@ def api_vote(code):
     db().commit()
 
     return jsonify({'ok': True})
-
 
 
 def build_options_for_question(game_id, qid):
