@@ -3,7 +3,7 @@ import json
 import secrets
 import random
 import time
-from supabase import create_client
+import requests
 from datetime import datetime
 from functools import wraps
 
