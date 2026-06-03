@@ -149,5 +149,5 @@ function scoreHtml(players) {
 
 function escapeHtml(text) { return String(text ?? '').replace(/[&<>'"]/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#039;','"':'&quot;'}[m])); }
 
-setInterval(api, 2500);
+setInterval(api, 4000);
 api(true);
