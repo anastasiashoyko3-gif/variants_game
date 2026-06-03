@@ -1,1 +1,33 @@
-{% extends 'base.html' %}{% block content %}<section class="card narrow"><h2>Приєднатися до гри</h2><p class="muted">{{game.title}}</p><form method="post" enctype="multipart/form-data"><input name="name" placeholder="Твоє імʼя"><label class="fileLabel">Аватарка з пристрою<input type="file" name="avatar_file" accept="image/*"></label><input name="avatar" placeholder="Або емодзі для аватарки"><input type="password" name="game_password" placeholder="Пароль гри"><button>Увійти</button></form>{% if error %}<p class="error">{{error}}</p>{% endif %}</section>{% endblock %}
+{% extends 'base.html' %}
+
+{% block content %}
+<section class="card narrow">
+  <h2>Приєднатися до гри</h2>
+  <p class="muted">{{game.title}}</p>
+
+  <form method="post" enctype="multipart/form-data">
+    <input name="name" placeholder="Твоє імʼя">
+
+    <input name="pin" placeholder="Твій PIN-код, наприклад 1234">
+
+    <label class="fileLabel">
+      Аватарка з пристрою
+      <input type="file" name="avatar_file" accept="image/*">
+    </label>
+
+    <input name="avatar" placeholder="Або емодзі для аватарки">
+
+    <input type="password" name="game_password" placeholder="Пароль гри">
+
+    <button>Увійти</button>
+  </form>
+
+  <p class="muted">
+    Якщо вже заходила в цю гру — введи те саме імʼя і PIN, щоб повернутися у свій профіль.
+  </p>
+
+  {% if error %}
+    <p class="error">{{error}}</p>
+  {% endif %}
+</section>
+{% endblock %}
