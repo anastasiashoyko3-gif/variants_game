@@ -19,10 +19,6 @@ function timer(dead) {
 
   return `<div class="timer">${left} сек</div>`;
 }
-  if (!dead) return '';
-  const left = Math.max(0, dead - Math.floor(Date.now() / 1000));
-  return `<div class="timer">${left} сек</div>`;
-}
 
 function qblock(s) {
   const q = s.question;
