@@ -338,8 +338,6 @@ def save_or_update_questions(game_id, reset_progress=True):
 
     conn.commit()
 
-    conn.commit()
-
 
 @app.route('/admin/game/<int:game_id>/questions', methods=['POST'])
 @admin_required
