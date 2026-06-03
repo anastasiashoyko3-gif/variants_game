@@ -761,51 +761,106 @@ def calculate_points(game_id, qid):
     db().commit()
 
 
+
 def pack_state(game, q, public=True):
     ps = [dict(p) for p in players(game['id'])]
-    opts = json.loads(q['options_json'] or '[]') if q else []
     player_id = session.get(f'player_{game["id"]}')
 
+    opts = json.loads(q['options_json'] or '[]') if q else []
+
     revealed_ids = []
-    if q:
-        revealed_ids = [
-            r['option_id']
-            for r in db().execute('SELECT option_id FROM revealed WHERE question_id=?', (q['id'],)).fetchall()
-        ]
-
     revealed = []
-    for o in opts:
-        if o['id'] in revealed_ids:
-            voters = []
-            for v in db().execute('SELECT * FROM votes WHERE question_id=? AND option_id=?', (q['id'], o['id'])).fetchall():
-                p = db().execute('SELECT * FROM players WHERE id=?', (v['player_id'],)).fetchone()
-                if p:
-                    voters.append(dict(p))
-
-            author = None
-            if o['type'] == 'player':
-                p = db().execute('SELECT * FROM players WHERE id=?', (o.get('player_id'),)).fetchone()
-                author = dict(p) if p else None
-            elif o['type'] == 'fake':
-                author = {'name': 'Фейк ведучої', 'avatar': game['host_avatar'] or '!'}
-            elif o['type'] == 'correct':
-                author = {'name': 'Правильна відповідь', 'avatar': '✓'}
-
-            revealed.append({**o, 'author': author, 'voters': voters})
-
     live_answers = []
     live_votes = []
-    if q:
-        for a in db().execute('SELECT * FROM answers WHERE question_id=?', (q['id'],)).fetchall():
-            p = db().execute('SELECT * FROM players WHERE id=?', (a['player_id'],)).fetchone()
-            if p:
-                live_answers.append({'player': dict(p), 'answer': a['text']})
+    points_rows = []
 
-        for v in db().execute('SELECT * FROM votes WHERE question_id=?', (q['id'],)).fetchall():
-            p = db().execute('SELECT * FROM players WHERE id=?', (v['player_id'],)).fetchone()
-            opt = next((o for o in opts if o['id'] == v['option_id']), None)
+    if q:
+        qid = q['id']
+
+        revealed_rows = db().execute(
+            'SELECT option_id FROM revealed WHERE question_id=?',
+            (qid,)
+        ).fetchall()
+
+        revealed_ids = [r['option_id'] for r in revealed_rows]
+
+        all_votes = db().execute(
+            'SELECT * FROM votes WHERE question_id=?',
+            (qid,)
+        ).fetchall()
+
+        all_answers = db().execute(
+            'SELECT * FROM answers WHERE question_id=?',
+            (qid,)
+        ).fetchall()
+
+        players_by_id = {p['id']: p for p in ps}
+        opts_by_id = {o['id']: o for o in opts}
+
+        for a in all_answers:
+            p = players_by_id.get(a['player_id'])
             if p:
-                live_votes.append({'player': dict(p), 'option_text': opt['text'] if opt else ''})
+                live_answers.append({
+                    'player': dict(p),
+                    'answer': a['text']
+                })
+
+        for v in all_votes:
+            p = players_by_id.get(v['player_id'])
+            opt = opts_by_id.get(v['option_id'])
+            if p:
+                live_votes.append({
+                    'player': dict(p),
+                    'option_text': opt['text'] if opt else ''
+                })
+
+        for o in opts:
+            if o['id'] not in revealed_ids:
+                continue
+
+            voters = []
+            for v in all_votes:
+                if v['option_id'] == o['id']:
+                    p = players_by_id.get(v['player_id'])
+                    if p:
+                        voters.append(dict(p))
+
+            author = None
+
+            if o['type'] == 'player':
+                p = players_by_id.get(o.get('player_id'))
+                author = dict(p) if p else None
+
+            elif o['type'] == 'fake':
+                author = {
+                    'name': 'Фейк ведучої',
+                    'avatar': game['host_avatar'] or '!'
+                }
+
+            elif o['type'] == 'correct':
+                author = {
+                    'name': 'Правильна відповідь',
+                    'avatar': '✓'
+                }
+
+            revealed.append({
+                **o,
+                'author': author,
+                'voters': voters
+            })
+
+        points_rows = [
+            dict(x)
+            for x in db().execute(
+                '''
+                SELECT players.name, points.points
+                FROM points
+                JOIN players ON players.id = points.player_id
+                WHERE points.question_id=?
+                ''',
+                (qid,)
+            ).fetchall()
+        ]
 
     return {
         'server_now': int(time.time()),
@@ -828,13 +883,7 @@ def pack_state(game, q, public=True):
         'revealed_ids': revealed_ids,
         'live_answers': live_answers if not public else [],
         'live_votes': live_votes if not public else [],
-        'points': [
-            dict(x)
-            for x in db().execute(
-                'SELECT players.name, points.points FROM points JOIN players ON players.id=points.player_id WHERE question_id=?',
-                (q['id'],)
-            ).fetchall()
-        ] if q else []
+        'points': points_rows
     }
 
 
