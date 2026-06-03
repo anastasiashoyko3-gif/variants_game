@@ -55,8 +55,42 @@ class Database:
 
 
 def save_upload(file):
-    if not file or not getattr(file, 'filename', ''):
-        return ''
+    if not file or not getattr(file, "filename", ""):
+        return ""
+
+    name = secure_filename(file.filename)
+
+    if not name or "." not in name:
+        return ""
+
+    ext = name.rsplit(".", 1)[1].lower()
+
+    if ext not in ALLOWED_EXTENSIONS:
+        return ""
+
+    filename = f"{secrets.token_urlsafe(16)}.{ext}"
+    file_path = f"uploads/{filename}"
+
+    if supabase_client:
+        file_bytes = file.read()
+
+        content_type = file.content_type or "application/octet-stream"
+
+        supabase_client.storage.from_(SUPABASE_BUCKET).upload(
+            file_path,
+            file_bytes,
+            {
+                "content-type": content_type,
+                "upsert": "true"
+            }
+        )
+
+        return supabase_client.storage.from_(SUPABASE_BUCKET).get_public_url(file_path)
+
+    local_path = os.path.join(UPLOAD_FOLDER, filename)
+    file.save(local_path)
+
+    return url_for("static", filename=f"uploads/{filename}")
 
     name = secure_filename(file.filename)
     if not name or '.' not in name:
