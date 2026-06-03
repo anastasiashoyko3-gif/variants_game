@@ -321,11 +321,11 @@ def save_or_update_questions(game_id, reset_progress=True):
             )
             order += 1
 
-       if reset_progress:
-        conn.execute(
+        if reset_progress:
+            conn.execute(
             """
-            UPDATE games
-            SET current_q=0,
+                UPDATE games
+             SET current_q=0,
                 phase='lobby',
                 status='active',
                 answer_deadline=NULL,
@@ -336,8 +336,7 @@ def save_or_update_questions(game_id, reset_progress=True):
             (game_id,)
         )
 
-    conn.commit()
-
+            conn.commit()
 
 @app.route('/admin/game/<int:game_id>/questions', methods=['POST'])
 @admin_required
