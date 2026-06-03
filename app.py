@@ -39,6 +39,9 @@ class Database:
     def commit(self):
         self.conn.commit()
 
+    def rollback(self):
+        self.conn.rollback()
+
     def close(self):
         self.conn.close()
 
@@ -293,7 +296,6 @@ def save_or_update_questions(game_id, reset_progress=True):
     data = request.form
     conn = db()
 
-    # Редагування гри скидає поточний прогрес, бо питання/відповіді могли змінитись.
     conn.execute('DELETE FROM votes WHERE game_id=?', (game_id,))
     conn.execute('DELETE FROM answers WHERE game_id=?', (game_id,))
     conn.execute('DELETE FROM revealed WHERE game_id=?', (game_id,))
@@ -301,7 +303,12 @@ def save_or_update_questions(game_id, reset_progress=True):
     conn.execute('DELETE FROM questions WHERE game_id=?', (game_id,))
     conn.execute('UPDATE players SET score=0 WHERE game_id=?', (game_id,))
 
-    host_avatar = save_upload(request.files.get('host_avatar')) or data.get('host_avatar_existing', '').strip()
+    old_game = get_game(game_id)
+    host_avatar = (
+        save_upload(request.files.get('host_avatar'))
+        or data.get('host_avatar_existing', '').strip()
+        or (old_game['host_avatar'] if old_game else '')
+    )
     title = data.get('title', '').strip() or 'Гра Варіанти'
     conn.execute('UPDATE games SET title=?, host_avatar=? WHERE id=?', (title, host_avatar, game_id))
 
@@ -321,22 +328,24 @@ def save_or_update_questions(game_id, reset_progress=True):
             )
             order += 1
 
-        if reset_progress:
-            conn.execute(
+    if reset_progress:
+        conn.execute(
             """
-                UPDATE games
-             SET current_q=0,
-                phase='lobby',
-                status='active',
+            UPDATE games
+            SET current_q=?,
+                phase=?,
+                status=?,
                 answer_deadline=NULL,
                 vote_deadline=NULL,
-                scoreboard_visible=0
-            WHERE id=%s
+                scoreboard_visible=?,
+                finished_at=NULL
+            WHERE id=?
             """,
-            (game_id,)
+            (0, 'lobby', 'active', 0, game_id)
         )
 
-            conn.commit()
+    conn.commit()
+
 
 @app.route('/admin/game/<int:game_id>/questions', methods=['POST'])
 @admin_required
@@ -368,31 +377,49 @@ def game_action(game_id):
     now = int(time.time())
 
     if action == 'show_question':
-        conn.execute('UPDATE games SET phase='question_preview', answer_deadline=NULL, vote_deadline=NULL, scoreboard_visible=0 WHERE id=?', (game_id,))
+        conn.execute(
+            'UPDATE games SET phase=?, answer_deadline=NULL, vote_deadline=NULL, scoreboard_visible=? WHERE id=?',
+            ('question_preview', 0, game_id)
+        )
     elif action == 'start_answers':
-        conn.execute('UPDATE games SET phase='answering', answer_deadline=? WHERE id=?', (now + ANSWER_SECONDS, game_id))
+        conn.execute(
+            'UPDATE games SET phase=?, answer_deadline=? WHERE id=?',
+            ('answering', now + ANSWER_SECONDS, game_id)
+        )
     elif action == 'show_options':
         build_options_for_question(game_id, q['id'])
-        conn.execute('UPDATE games SET phase='preview', answer_deadline=NULL WHERE id=?', (game_id,))
+        conn.execute(
+            'UPDATE games SET phase=?, answer_deadline=NULL WHERE id=?',
+            ('preview', game_id)
+        )
     elif action == 'start_voting':
-        conn.execute('UPDATE games SET phase='voting', vote_deadline=? WHERE id=?', (now + VOTE_SECONDS, game_id))
+        conn.execute(
+            'UPDATE games SET phase=?, vote_deadline=? WHERE id=?',
+            ('voting', now + VOTE_SECONDS, game_id)
+        )
     elif action == 'finish_voting':
         calculate_points(game_id, q['id'])
-        conn.execute('UPDATE games SET phase='results', vote_deadline=NULL WHERE id=?', (game_id,))
+        conn.execute(
+            'UPDATE games SET phase=?, vote_deadline=NULL WHERE id=?',
+            ('results', game_id)
+        )
     elif action == 'show_scoreboard':
-        conn.execute('UPDATE games SET scoreboard_visible=1 WHERE id=?', (game_id,))
+        conn.execute(
+            'UPDATE games SET scoreboard_visible=? WHERE id=?',
+            (1, game_id)
+        )
     elif action == 'next_question':
         next_idx = game['current_q'] + 1
         total = len(get_questions(game_id))
         if next_idx >= total:
             conn.execute(
-                'UPDATE games SET phase='finished', status='finished', finished_at=? WHERE id=?',
-                (datetime.now().strftime('%Y-%m-%d %H:%M'), game_id)
+                'UPDATE games SET phase=?, status=?, finished_at=? WHERE id=?',
+                ('finished', 'finished', datetime.now().strftime('%Y-%m-%d %H:%M'), game_id)
             )
         else:
             conn.execute(
-                'UPDATE games SET current_q=?, phase='question_preview', scoreboard_visible=0, answer_deadline=NULL, vote_deadline=NULL WHERE id=?',
-                (next_idx, game_id)
+                'UPDATE games SET current_q=?, phase=?, scoreboard_visible=?, answer_deadline=NULL, vote_deadline=NULL WHERE id=?',
+                (next_idx, 'question_preview', 0, game_id)
             )
 
     conn.commit()
@@ -589,7 +616,10 @@ def calculate_points(game_id, qid):
             pts[o['player_id']] = pts.get(o['player_id'], 0) + 1
 
     for pid, p in pts.items():
-        db().execute('INSERT INTO points(game_id,question_id,player_id,points) VALUES(?,?,?,?) ON CONFLICT(question_id, player_id) DO UPDATE SET points = EXCLUDED.points', (game_id, qid, pid, p))
+        db().execute(
+            'INSERT INTO points(game_id,question_id,player_id,points) VALUES(?,?,?,?) ON CONFLICT(question_id, player_id) DO UPDATE SET points = EXCLUDED.points',
+            (game_id, qid, pid, p)
+        )
         db().execute('UPDATE players SET score=score+? WHERE id=?', (p, pid))
 
     db().commit()
