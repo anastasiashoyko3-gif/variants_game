@@ -12,6 +12,14 @@ async function api() {
 
 function timer(dead) {
   if (!dead) return '';
+
+  const deadline = Number(dead);
+  const now = Math.floor(Date.now() / 1000);
+  const left = Math.max(0, deadline - now);
+
+  return `<div class="timer">${left} сек</div>`;
+}
+  if (!dead) return '';
   const left = Math.max(0, dead - Math.floor(Date.now() / 1000));
   return `<div class="timer">${left} сек</div>`;
 }
