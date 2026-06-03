@@ -1,0 +1,5 @@
+variants_game.db
+static/uploads/
+__pycache__/
+*.pyc
+.env
