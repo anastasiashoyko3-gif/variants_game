@@ -6,8 +6,8 @@ import time
 from datetime import datetime
 from functools import wraps
 
-import psycopg2
-import psycopg2.extras
+import psycopg
+from psycopg.rows import dict_row
 from flask import Flask, render_template, request, redirect, url_for, session, jsonify, g
 from werkzeug.utils import secure_filename
 
