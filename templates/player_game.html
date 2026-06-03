@@ -1,0 +1,1 @@
+{% extends 'base.html' %}{% block content %}<section class="card"><p class="muted">Гравець: <b>{{player.name}}</b></p><div id="playerState">Завантаження...</div></section>{% endblock %}{% block scripts %}<script>window.INVITE_CODE="{{game.invite_code}}";</script><script src="/static/player.js?v=4"></script>{% endblock %}
