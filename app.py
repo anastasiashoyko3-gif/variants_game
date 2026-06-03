@@ -70,7 +70,7 @@ def db():
         raise RuntimeError('DATABASE_URL не знайдено. Додай його в Render Environment Variables.')
 
     if 'db' not in g:
-        conn = psycopg2.connect(DATABASE_URL, sslmode='require')
+        psycopg.connect(DATABASE_URL, sslmode='require', row_factory=dict_row)
         g.db = Database(conn)
     return g.db
 
