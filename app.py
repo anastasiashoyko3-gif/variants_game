@@ -353,14 +353,31 @@ def api_admin_state(game_id):
 
 @app.route('/api/answer/<code>', methods=['POST'])
 def api_answer(code):
-    game=get_game_by_code(code); pid=session.get(f'player_{game["id"]}') if game else None
-    if not game or not pid: return jsonify({'ok':False})
-    if game['phase']!='answering': return jsonify({'ok':False,'message':'Зараз не етап відповідей'})
+    game = get_game_by_code(code)
+    pid = session.get(f'player_{game["id"]}') if game else None
+
+    if not game or not pid:
+        return jsonify({'ok': False})
+
+    now = int(time.time())
+
+    if game['phase'] != 'answering':
+        return jsonify({'ok': False, 'message': 'Зараз не етап відповідей'})
+
+    if game['answer_deadline'] and now > int(game['answer_deadline']):
+        return jsonify({'ok': False, 'message': 'Час на відповідь вийшов'})
+
     payload = request.get_json(silent=True) or {}
-    text=(payload.get('answer') or '').strip()
+    text = (payload.get('answer') or '').strip()
+
     if text:
-        db().execute('INSERT OR REPLACE INTO answers(game_id,question_id,player_id,text) VALUES(?,?,?,?)',(game['id'],get_current_question(game)['id'],pid,text)); db().commit()
-    return jsonify({'ok':True})
+        db().execute(
+            'INSERT OR REPLACE INTO answers(game_id,question_id,player_id,text) VALUES(?,?,?,?)',
+            (game['id'], get_current_question(game)['id'], pid, text)
+        )
+        db().commit()
+
+    return jsonify({'ok': True})
 
 
 @app.route('/api/vote/<code>', methods=['POST'])
