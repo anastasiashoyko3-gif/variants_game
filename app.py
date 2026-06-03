@@ -32,7 +32,7 @@ class Database:
 
     def execute(self, query, params=()):
         query = query.replace('?', '%s')
-        cur = self.conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        cur = self.conn.cursor()
         cur.execute(query, params)
         return cur
 
