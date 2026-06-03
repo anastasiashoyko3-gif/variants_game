@@ -87,7 +87,7 @@ def init_db():
         print('DATABASE_URL не заданий. Таблиці не створені автоматично.')
         return
 
-    conn = psycopg2.connect(DATABASE_URL, sslmode='require')
+    conn = psycopg.connect(DATABASE_URL, sslmode='require', row_factory=dict_row)
     cur = conn.cursor()
     cur.execute("""
     CREATE TABLE IF NOT EXISTS games (
