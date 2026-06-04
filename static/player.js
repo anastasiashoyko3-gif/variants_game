@@ -177,7 +177,7 @@ function scoreHtml(players) {
 
 function escapeHtml(text) { return String(text ?? '').replace(/[&<>'"]/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#039;','"':'&quot;'}[m])); }
 
-setInterval(api, 4000);
+setInterval(api, 1000);
 
 setInterval(() => {
   if (last) {
