@@ -226,12 +226,12 @@ function scoreHtml(players) {
 
 function escapeHtml(text) { return String(text ?? '').replace(/[&<>'"]/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#039;','"':'&quot;'}[m])); }
 
-setInterval(api, 800);
+setInterval(api, 1000);
 
 setInterval(() => {
   if (last) {
     updateTimer();
   }
-}, 800);
+}, 1000);
 
 api(true);
