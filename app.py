@@ -248,7 +248,9 @@ def seconds_left(deadline):
     if not deadline:
         return None
     return max(0, int(deadline) - int(time.time()))
-    def clear_game_cache(game_id=None, code=None):
+
+
+def clear_game_cache(game_id=None, code=None):
     if game_id is not None:
         STATE_CACHE.pop(f"admin:{game_id}", None)
 
