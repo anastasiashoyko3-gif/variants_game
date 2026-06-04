@@ -536,7 +536,13 @@ def game_play(code):
         return redirect(url_for('invite', code=code))
 
     player = db().execute('SELECT * FROM players WHERE id=?', (pid,)).fetchone()
-    return render_template('player_game.html', game=game, player=player)
+    return render_template(
+    'player_game.html',
+    game=game,
+    player=player,
+    supabase_url=SUPABASE_URL,
+    supabase_public_key=os.environ.get('SUPABASE_PUBLIC_KEY', '')
+)
 
 
 @app.route('/api/state/<code>')
