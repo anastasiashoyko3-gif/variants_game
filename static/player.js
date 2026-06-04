@@ -285,7 +285,7 @@ function escapeHtml(text) {
   }[m]));
 }
 
-setInterval(api, 1000);
+setInterval(api, 800);
 
 setInterval(() => {
   if (last) {
