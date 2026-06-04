@@ -537,19 +537,47 @@ def game_play(code):
 
 @app.route('/api/state/<code>')
 def api_state(code):
+    cache_key = f"public:{code}"
+    now = time.time()
+
+    cached = STATE_CACHE.get(cache_key)
+    if cached and now - cached["time"] < CACHE_TTL:
+        return jsonify(cached["data"])
+
     game = get_game_by_code(code)
     if not game:
         return jsonify({'error': 'not found'}), 404
-    q = get_current_question(game)
-    return jsonify(pack_state(game, q, public=True))
 
+    q = get_current_question(game)
+    data = pack_state(game, q, public=True)
+
+    STATE_CACHE[cache_key] = {
+        "time": now,
+        "data": data
+    }
+
+    return jsonify(data)
 
 @app.route('/api/admin_state/<int:game_id>')
 @admin_required
 def api_admin_state(game_id):
+    cache_key = f"admin:{game_id}"
+    now = time.time()
+
+    cached = STATE_CACHE.get(cache_key)
+    if cached and now - cached["time"] < CACHE_TTL:
+        return jsonify(cached["data"])
+
     game = get_game(game_id)
     q = get_current_question(game) if game else None
-    return jsonify(pack_state(game, q, public=False))
+    data = pack_state(game, q, public=False)
+
+    STATE_CACHE[cache_key] = {
+        "time": now,
+        "data": data
+    }
+
+    return jsonify(data)
 
 
 @app.route('/api/answer/<code>', methods=['POST'])
