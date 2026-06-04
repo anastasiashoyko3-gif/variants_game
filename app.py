@@ -248,6 +248,17 @@ def seconds_left(deadline):
     if not deadline:
         return None
     return max(0, int(deadline) - int(time.time()))
+    def clear_game_cache(game_id=None, code=None):
+    if game_id is not None:
+        STATE_CACHE.pop(f"admin:{game_id}", None)
+
+    if code is not None:
+        STATE_CACHE.pop(f"public:{code}", None)
+
+    if game_id is not None:
+        game = get_game(game_id)
+        if game:
+            STATE_CACHE.pop(f"public:{game['invite_code']}", None)
 
 
 @app.route('/')
