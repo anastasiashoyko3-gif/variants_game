@@ -609,6 +609,7 @@ def api_answer(code):
         (game['id'], q['id'], pid, text),
     )
     db().commit()
+    clear_game_cache(game_id=game['id'], code=code)
     return jsonify({'ok': True})
 
 
@@ -646,6 +647,7 @@ def api_vote(code):
         (game['id'], q['id'], pid, opt),
     )
     db().commit()
+    clear_game_cache(game_id=game['id'], code=code)
     return jsonify({'ok': True})
 
 
