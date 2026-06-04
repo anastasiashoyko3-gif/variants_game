@@ -1,11 +1,28 @@
 const box = document.getElementById('adminState'), score = document.getElementById('scoreBoard');
 let last = null;
+let loading = false;
 
-async function api(){
-  let r = await fetch('/api/admin_state/' + window.GAME_ID, {cache:'no-store'});
-  let s = await r.json();
-  last = s;
-  render(s);
+async function api() {
+  if (loading) return;
+
+  loading = true;
+
+  try {
+    let r = await fetch('/api/admin_state/' + window.GAME_ID, {
+      cache: 'no-store'
+    });
+
+    if (!r.ok) return;
+
+    let s = await r.json();
+    last = s;
+    render(s);
+
+  } catch(e) {
+    console.error(e);
+  } finally {
+    loading = false;
+  }
 }
 function post(action){let f=document.createElement('form');f.method='post';f.action='/admin/game/'+window.GAME_ID+'/action';f.innerHTML=`<input name="action" value="${action}">`;document.body.appendChild(f);f.submit()}
 function reveal(id){let f=document.createElement('form');f.method='post';f.action='/admin/game/'+window.GAME_ID+'/reveal';f.innerHTML=`<input name="option_id" value="${id}">`;document.body.appendChild(f);f.submit()}
@@ -18,4 +35,4 @@ function av(p,size=''){let v=(p&&p.avatar)||'';let cls=`avatar ${size}`.trim();i
 function revealHtml(r){let author=r.author||(r.type==='correct'?{name:'Правильна відповідь',avatar:'✓'}:r.type==='fake'?{name:'Фейк ведучої',avatar:'!'}:null);return `<div class="revealRow revealGrid"><div class="avatarLine authorSide">${av(author,'big')}<b>${author?esc(author.name):'Невідомо'}</b></div><div><span class="tag ${r.type==='correct'?'correct':r.type==='fake'?'fake':''}">${r.type==='correct'?'Правильна':r.type==='fake'?'Фейк':'Гравець'}</span><div class="answerBig">${esc(r.text)}</div></div><div><b>Голосували:</b><div class="votersAvatars">${r.voters.length?r.voters.map(v=>`<div class="avatarLine voterMini">${av(v,'small')}<span>${esc(v.name)}</span></div>`).join(''):'<p class="muted">Ніхто</p>'}</div></div></div>`}
 function scoreHtml(players){let arr=[...players].sort((a,b)=>b.score-a.score);return arr.map((p,i)=>`<div class="playerRow rank${i+1}"><div class="avatarLine">${av(p)}<b>${i===0?'🥇':i===1?'🥈':i===2?'🥉':i+1+'.'} ${esc(p.name)}</b></div><b>${p.score}</b></div>`).join('')||'<p class="muted">Гравців ще немає.</p>'}
 function esc(text){return String(text??'').replace(/[&<>'"]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#039;','"':'&quot;'}[m]))}
-setInterval(api, 1000);
+setInterval(api, 800);
