@@ -3,13 +3,8 @@ let last = null;
 let serverOffset = 0;
 let lastKey = '';
 let poll = null;
-let loading = false;
 
 async function api(force = false) {
-  if (loading) return;
-
-  loading = true;
-
   try {
     const r = await fetch('/api/state/' + window.INVITE_CODE, {
       cache: 'no-store'
@@ -19,6 +14,21 @@ async function api(force = false) {
       console.log('Server error:', r.status);
       return;
     }
+
+    const s = await r.json();
+
+    if (s.server_now) {
+      serverOffset = s.server_now - Math.floor(Date.now() / 1000);
+    }
+
+    last = s;
+    render(s, force);
+
+  } catch (e) {
+    console.error(e);
+    box.innerHTML = '<p class="error">Не вдалося завантажити гру. Онови сторінку.</p>';
+  }
+}
 
     const s = await r.json();
 
@@ -222,6 +232,6 @@ setInterval(() => {
   if (last) {
     updateTimer();
   }
-}, 1000);
+}, 800);
 
 api(true);
