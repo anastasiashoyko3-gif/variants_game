@@ -285,7 +285,38 @@ function escapeHtml(text) {
   }[m]));
 }
 
-setInterval(api, 1500);
+function setupRealtime() {
+  if (!window.SUPABASE_URL || !window.SUPABASE_PUBLIC_KEY || !window.GAME_ID) {
+    console.log('Realtime disabled: missing config');
+    return;
+  }
+
+  const client = supabase.createClient(
+    window.SUPABASE_URL,
+    window.SUPABASE_PUBLIC_KEY
+  );
+
+  client
+    .channel('game-' + window.GAME_ID)
+    .on(
+      'postgres_changes',
+      {
+        event: '*',
+        schema: 'public',
+        table: 'games',
+        filter: 'id=eq.' + window.GAME_ID
+      },
+      () => {
+        api(true);
+      }
+    )
+    .subscribe((status) => {
+      console.log('Realtime status:', status);
+    });
+}
+
+setupRealtime();
+setInterval(api, 10000);
 
 setInterval(() => {
   if (last) {
