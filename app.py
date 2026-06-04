@@ -473,6 +473,7 @@ def reveal(game_id):
             (game_id, q['id'], option_id),
         )
         db().commit()
+        clear_game_cache(game_id=game_id)
     return redirect(url_for('admin_game', game_id=game_id))
 
 
