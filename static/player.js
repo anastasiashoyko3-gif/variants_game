@@ -45,9 +45,27 @@ function timer(left) {
 function updateTimer() {
   const t = document.getElementById('timerBox');
   if (!t || !last) return;
-  const left = timeLeft(last);
-  if (left === null) return;
-  t.textContent = `${Math.max(0, left)} сек`;
+
+  let deadline = null;
+
+  if (last.game.phase === 'answering') {
+    deadline = last.game.answer_deadline;
+  }
+
+  if (last.game.phase === 'voting') {
+    deadline = last.game.vote_deadline;
+  }
+
+  if (!deadline) return;
+
+  const now = Math.floor(Date.now() / 1000) + serverOffset;
+  const left = Math.max(0, Number(deadline) - now);
+
+  t.textContent = `${left} сек`;
+
+  if (left <= 0) {
+    api(true);
+  }
 }
 
 function qblock(s) {
@@ -160,4 +178,11 @@ function scoreHtml(players) {
 function escapeHtml(text) { return String(text ?? '').replace(/[&<>'"]/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#039;','"':'&quot;'}[m])); }
 
 setInterval(api, 4000);
+
+setInterval(() => {
+  if (last) {
+    updateTimer();
+  }
+}, 1000);
+
 api(true);
