@@ -3,8 +3,12 @@ const box = document.getElementById('playerState');
 let last = null;
 let serverOffset = 0;
 let lastKey = '';
+let loading = false;
 
 async function api(force = false) {
+  if (loading) return;
+  loading = true;
+
   try {
     const r = await fetch('/api/state/' + window.INVITE_CODE, {
       cache: 'no-store'
@@ -27,6 +31,8 @@ async function api(force = false) {
   } catch (e) {
     console.error(e);
     box.innerHTML = '<p class="error">Не вдалося завантажити гру. Онови сторінку.</p>';
+  } finally {
+    loading = false;
   }
 }
 
