@@ -30,6 +30,8 @@ ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'webp', 'gif'}
 ROUNDS = [6, 6, 5]
 ANSWER_SECONDS = 60
 VOTE_SECONDS = 45
+STATE_CACHE = {}
+CACHE_TTL = 0.7
 
 
 class Database:
