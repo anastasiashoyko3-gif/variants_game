@@ -3,15 +3,38 @@ let last = null;
 let serverOffset = 0;
 let lastKey = '';
 let poll = null;
+let loading = false;
 
 async function api(force = false) {
+  if (loading) return;
+
+  loading = true;
+
   try {
-    const r = await fetch('/api/state/' + window.INVITE_CODE, {cache: 'no-store'});
+    const r = await fetch('/api/state/' + window.INVITE_CODE, {
+      cache: 'no-store'
+    });
 
     if (!r.ok) {
       console.log('Server error:', r.status);
       return;
     }
+
+    const s = await r.json();
+
+    if (s.server_now) {
+      serverOffset = s.server_now - Math.floor(Date.now() / 1000);
+    }
+
+    last = s;
+    render(s, force);
+
+  } catch (e) {
+    console.error(e);
+  } finally {
+    loading = false;
+  }
+}
 
     const s = await r.json();
     if (s.server_now) {
@@ -177,7 +200,7 @@ function scoreHtml(players) {
 
 function escapeHtml(text) { return String(text ?? '').replace(/[&<>'"]/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#039;','"':'&quot;'}[m])); }
 
-setInterval(api, 1000);
+setInterval(api, 800);
 
 setInterval(() => {
   if (last) {
