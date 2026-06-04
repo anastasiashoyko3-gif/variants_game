@@ -18,12 +18,13 @@ app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'dev-secret-change-me')
 DATABASE_URL = os.environ.get('DATABASE_URL')
 ADMIN_PASSWORD = os.environ.get('ADMIN_PASSWORD', 'admin123')
 GAME_PASSWORD = os.environ.get('GAME_PASSWORD', 'game123')
+
 UPLOAD_FOLDER = os.environ.get('UPLOAD_FOLDER', os.path.join(app.root_path, 'static', 'uploads'))
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
-SUPABASE_URL = os.environ.get("SUPABASE_URL")
-SUPABASE_SERVICE_KEY = os.environ.get("SUPABASE_SERVICE_KEY")
-SUPABASE_BUCKET = os.environ.get("SUPABASE_BUCKET", "uploads")
 
+SUPABASE_URL = os.environ.get('SUPABASE_URL')
+SUPABASE_SERVICE_KEY = os.environ.get('SUPABASE_SERVICE_KEY')
+SUPABASE_BUCKET = os.environ.get('SUPABASE_BUCKET', 'uploads')
 
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'webp', 'gif'}
 ROUNDS = [6, 6, 5]
@@ -36,6 +37,7 @@ class Database:
         self.conn = conn
 
     def execute(self, query, params=()):
+        # Allows the old SQLite-style ? placeholders to work with PostgreSQL.
         query = query.replace('?', '%s')
         cur = self.conn.cursor()
         cur.execute(query, params)
@@ -51,101 +53,6 @@ class Database:
         self.conn.close()
 
 
-def save_upload(file):
-    if not file or not getattr(file, "filename", ""):
-        return ""
-
-    name = secure_filename(file.filename)
-
-    if not name or "." not in name:
-        return ""
-
-    ext = name.rsplit(".", 1)[1].lower()
-
-    if ext not in ALLOWED_EXTENSIONS:
-        return ""
-
-    filename = f"{secrets.token_urlsafe(16)}.{ext}"
-    file_path = f"uploads/{filename}"
-
-    if SUPABASE_URL and SUPABASE_SERVICE_KEY:
-        file_bytes = file.read()
-        content_type = file.content_type or "application/octet-stream"
-
-        upload_url = f"{SUPABASE_URL}/storage/v1/object/{SUPABASE_BUCKET}/{file_path}"
-
-        response = requests.post(
-            upload_url,
-            headers={
-                "apikey": SUPABASE_SERVICE_KEY,
-                "Authorization": f"Bearer {SUPABASE_SERVICE_KEY}",
-                "Content-Type": content_type,
-                "x-upsert": "true",
-            },
-            data=file_bytes,
-            timeout=30,
-        )
-
-        if response.status_code not in (200, 201):
-            print("Supabase upload error:", response.status_code, response.text)
-            return ""
-
-        return f"{SUPABASE_URL}/storage/v1/object/public/{SUPABASE_BUCKET}/{file_path}"
-
-    local_path = os.path.join(UPLOAD_FOLDER, filename)
-    file.save(local_path)
-
-    return url_for("static", filename=f"uploads/{filename}")
-
-    name = secure_filename(file.filename)
-
-    if not name or "." not in name:
-        return ""
-
-    ext = name.rsplit(".", 1)[1].lower()
-
-    if ext not in ALLOWED_EXTENSIONS:
-        return ""
-
-    filename = f"{secrets.token_urlsafe(16)}.{ext}"
-    file_path = f"uploads/{filename}"
-
-    if supabase_client:
-        file_bytes = file.read()
-
-        content_type = file.content_type or "application/octet-stream"
-
-        supabase_client.storage.from_(SUPABASE_BUCKET).upload(
-            file_path,
-            file_bytes,
-            {
-                "content-type": content_type,
-                "upsert": "true"
-            }
-        )
-
-        return supabase_client.storage.from_(SUPABASE_BUCKET).get_public_url(file_path)
-
-    local_path = os.path.join(UPLOAD_FOLDER, filename)
-    file.save(local_path)
-
-    return url_for("static", filename=f"uploads/{filename}")
-
-    name = secure_filename(file.filename)
-    if not name or '.' not in name:
-        return ''
-
-    ext = name.rsplit('.', 1)[1].lower()
-    if ext not in ALLOWED_EXTENSIONS:
-        return ''
-
-    fname = f'{secrets.token_urlsafe(12)}.{ext}'
-    path = os.path.join(UPLOAD_FOLDER, fname)
-    file.save(path)
-
-    return url_for('static', filename=f'uploads/{fname}')
-
-
 def db():
     if not DATABASE_URL:
         raise RuntimeError('DATABASE_URL не знайдено. Додай його в Render Environment Variables.')
@@ -155,6 +62,7 @@ def db():
         g.db = Database(conn)
 
     return g.db
+
 
 @app.teardown_appcontext
 def close_db(exc):
@@ -170,7 +78,7 @@ def init_db():
 
     conn = psycopg.connect(DATABASE_URL, sslmode='require', row_factory=dict_row)
     cur = conn.cursor()
-    cur.execute("""
+    cur.execute('''
     CREATE TABLE IF NOT EXISTS games (
       id BIGSERIAL PRIMARY KEY,
       invite_code TEXT UNIQUE NOT NULL,
@@ -203,6 +111,7 @@ def init_db():
       game_id BIGINT NOT NULL REFERENCES games(id) ON DELETE CASCADE,
       name TEXT NOT NULL,
       avatar TEXT DEFAULT '',
+      pin TEXT DEFAULT '',
       score INTEGER DEFAULT 0,
       created_at TEXT NOT NULL
     );
@@ -241,12 +150,56 @@ def init_db():
       points INTEGER NOT NULL,
       UNIQUE(question_id, player_id)
     );
-    """)
+    ''')
+    cur.execute("ALTER TABLE players ADD COLUMN IF NOT EXISTS pin TEXT DEFAULT '';")
     conn.commit()
     conn.close()
 
 
 init_db()
+
+
+def save_upload(file):
+    if not file or not getattr(file, 'filename', ''):
+        return ''
+
+    name = secure_filename(file.filename)
+    if not name or '.' not in name:
+        return ''
+
+    ext = name.rsplit('.', 1)[1].lower()
+    if ext not in ALLOWED_EXTENSIONS:
+        return ''
+
+    filename = f'{secrets.token_urlsafe(16)}.{ext}'
+
+    if SUPABASE_URL and SUPABASE_SERVICE_KEY:
+        file_bytes = file.read()
+        content_type = file.content_type or 'application/octet-stream'
+        file_path = filename
+        upload_url = f'{SUPABASE_URL}/storage/v1/object/{SUPABASE_BUCKET}/{file_path}'
+
+        response = requests.post(
+            upload_url,
+            headers={
+                'apikey': SUPABASE_SERVICE_KEY,
+                'Authorization': f'Bearer {SUPABASE_SERVICE_KEY}',
+                'Content-Type': content_type,
+                'x-upsert': 'true',
+            },
+            data=file_bytes,
+            timeout=30,
+        )
+
+        if response.status_code not in (200, 201):
+            print('Supabase upload error:', response.status_code, response.text)
+            return ''
+
+        return f'{SUPABASE_URL}/storage/v1/object/public/{SUPABASE_BUCKET}/{file_path}'
+
+    local_path = os.path.join(UPLOAD_FOLDER, filename)
+    file.save(local_path)
+    return url_for('static', filename=f'uploads/{filename}')
 
 
 def admin_required(fn):
@@ -338,7 +291,7 @@ def admin_new():
     conn = db()
     cur = conn.execute(
         'INSERT INTO games(invite_code,title,host_avatar,status,phase,created_at) VALUES(?,?,?,?,?,?) RETURNING id',
-        (code, title, host_avatar, 'setup', 'setup', datetime.now().strftime('%Y-%m-%d %H:%M'))
+        (code, title, host_avatar, 'setup', 'setup', datetime.now().strftime('%Y-%m-%d %H:%M')),
     )
     conn.commit()
     new_game = cur.fetchone()
@@ -377,6 +330,7 @@ def save_or_update_questions(game_id, reset_progress=True):
     data = request.form
     conn = db()
 
+    # Editing questions resets gameplay state, because answers/votes/options may no longer match.
     conn.execute('DELETE FROM votes WHERE game_id=?', (game_id,))
     conn.execute('DELETE FROM answers WHERE game_id=?', (game_id,))
     conn.execute('DELETE FROM revealed WHERE game_id=?', (game_id,))
@@ -405,24 +359,19 @@ def save_or_update_questions(game_id, reset_progress=True):
             round_no = 1 if i < 6 else 2 if i < 12 else 3
             conn.execute(
                 'INSERT INTO questions(game_id,q_order,round_no,text,correct_answer,fake_answer,photo_url) VALUES(?,?,?,?,?,?,?)',
-                (game_id, order, round_no, text, correct, fake, photo)
+                (game_id, order, round_no, text, correct, fake, photo),
             )
             order += 1
 
     if reset_progress:
         conn.execute(
-            """
+            '''
             UPDATE games
-            SET current_q=?,
-                phase=?,
-                status=?,
-                answer_deadline=NULL,
-                vote_deadline=NULL,
-                scoreboard_visible=?,
-                finished_at=NULL
+            SET current_q=?, phase=?, status=?, answer_deadline=NULL, vote_deadline=NULL,
+                scoreboard_visible=?, finished_at=NULL
             WHERE id=?
-            """,
-            (0, 'lobby', 'active', 0, game_id)
+            ''',
+            (0, 'lobby', 'active', 0, game_id),
         )
 
     conn.commit()
@@ -460,47 +409,38 @@ def game_action(game_id):
     if action == 'show_question':
         conn.execute(
             'UPDATE games SET phase=?, answer_deadline=NULL, vote_deadline=NULL, scoreboard_visible=? WHERE id=?',
-            ('question_preview', 0, game_id)
+            ('question_preview', 0, game_id),
         )
     elif action == 'start_answers':
         conn.execute(
             'UPDATE games SET phase=?, answer_deadline=? WHERE id=?',
-            ('answering', now + ANSWER_SECONDS, game_id)
+            ('answering', now + ANSWER_SECONDS, game_id),
         )
     elif action == 'show_options':
         build_options_for_question(game_id, q['id'])
-        conn.execute(
-            'UPDATE games SET phase=?, answer_deadline=NULL WHERE id=?',
-            ('preview', game_id)
-        )
+        conn.execute('UPDATE games SET phase=?, answer_deadline=NULL WHERE id=?', ('preview', game_id))
     elif action == 'start_voting':
         conn.execute(
             'UPDATE games SET phase=?, vote_deadline=? WHERE id=?',
-            ('voting', now + VOTE_SECONDS, game_id)
+            ('voting', now + VOTE_SECONDS, game_id),
         )
     elif action == 'finish_voting':
         calculate_points(game_id, q['id'])
-        conn.execute(
-            'UPDATE games SET phase=?, vote_deadline=NULL WHERE id=?',
-            ('results', game_id)
-        )
+        conn.execute('UPDATE games SET phase=?, vote_deadline=NULL WHERE id=?', ('results', game_id))
     elif action == 'show_scoreboard':
-        conn.execute(
-            'UPDATE games SET scoreboard_visible=? WHERE id=?',
-            (1, game_id)
-        )
+        conn.execute('UPDATE games SET scoreboard_visible=? WHERE id=?', (1, game_id))
     elif action == 'next_question':
         next_idx = game['current_q'] + 1
         total = len(get_questions(game_id))
         if next_idx >= total:
             conn.execute(
                 'UPDATE games SET phase=?, status=?, finished_at=? WHERE id=?',
-                ('finished', 'finished', datetime.now().strftime('%Y-%m-%d %H:%M'), game_id)
+                ('finished', 'finished', datetime.now().strftime('%Y-%m-%d %H:%M'), game_id),
             )
         else:
             conn.execute(
                 'UPDATE games SET current_q=?, phase=?, scoreboard_visible=?, answer_deadline=NULL, vote_deadline=NULL WHERE id=?',
-                (next_idx, 'question_preview', 0, game_id)
+                (next_idx, 'question_preview', 0, game_id),
             )
 
     conn.commit()
@@ -516,7 +456,7 @@ def reveal(game_id):
     if q and option_id:
         db().execute(
             'INSERT INTO revealed(game_id,question_id,option_id) VALUES(?,?,?) ON CONFLICT(question_id, option_id) DO NOTHING',
-            (game_id, q['id'], option_id)
+            (game_id, q['id'], option_id),
         )
         db().commit()
     return redirect(url_for('admin_game', game_id=game_id))
@@ -530,42 +470,25 @@ def play_home():
 @app.route('/invite/<code>', methods=['GET', 'POST'])
 def invite(code):
     game = get_game_by_code(code)
-
     if not game:
-        return render_template(
-            'message.html',
-            title='Гри немає',
-            text='Такого інвайту не існує.'
-        )
+        return render_template('message.html', title='Гри немає', text='Такого інвайту не існує.')
 
     if request.method == 'POST':
         if request.form.get('game_password') != GAME_PASSWORD:
-            return render_template(
-                'invite.html',
-                game=game,
-                error='Неправильний пароль гри'
-            )
+            return render_template('invite.html', game=game, error='Неправильний пароль гри')
 
         name = request.form.get('name', '').strip()
         pin = request.form.get('pin', '').strip()
 
         if not name:
-            return render_template(
-                'invite.html',
-                game=game,
-                error='Введи імʼя'
-            )
+            return render_template('invite.html', game=game, error='Введи імʼя')
 
         if not pin:
-            return render_template(
-                'invite.html',
-                game=game,
-                error='Введи PIN-код'
-            )
+            return render_template('invite.html', game=game, error='Введи PIN-код')
 
         existing = db().execute(
             'SELECT * FROM players WHERE game_id=? AND lower(name)=lower(?) AND pin=? LIMIT 1',
-            (game['id'], name, pin)
+            (game['id'], name, pin),
         ).fetchone()
 
         if existing:
@@ -573,34 +496,9 @@ def invite(code):
             return redirect(url_for('game_play', code=code))
 
         avatar = save_upload(request.files.get('avatar_file')) or request.form.get('avatar', '').strip()
-
         cur = db().execute(
             'INSERT INTO players(game_id,name,avatar,pin,created_at) VALUES(?,?,?,?,?) RETURNING id',
-            (game['id'], name, avatar, pin, datetime.now().strftime('%H:%M'))
-        )
-
-        db().commit()
-
-        new_player = cur.fetchone()
-        session[f'player_{game["id"]}'] = new_player['id']
-
-        return redirect(url_for('game_play', code=code))
-
-    return render_template('invite.html', game=game)
-
-    if request.method == 'POST':
-        if request.form.get('game_password') != GAME_PASSWORD:
-            return render_template('invite.html', game=game, error='Неправильний пароль гри')
-
-        name = request.form.get('name', '').strip()
-        avatar = save_upload(request.files.get('avatar_file')) or request.form.get('avatar', '').strip()
-
-        if not name:
-            return render_template('invite.html', game=game, error='Введи імʼя')
-
-        cur = db().execute(
-            'INSERT INTO players(game_id,name,avatar,created_at) VALUES(?,?,?,?) RETURNING id',
-            (game['id'], name, avatar, datetime.now().strftime('%H:%M'))
+            (game['id'], name, avatar, pin, datetime.now().strftime('%H:%M')),
         )
         db().commit()
         new_player = cur.fetchone()
@@ -661,16 +559,14 @@ def api_answer(code):
 
     payload = request.get_json(silent=True) or {}
     text = (payload.get('answer') or '').strip()
-
     if not text:
         return jsonify({'ok': False, 'message': 'Спочатку напиши відповідь'})
 
     db().execute(
         'INSERT INTO answers(game_id,question_id,player_id,text) VALUES(?,?,?,?) ON CONFLICT(question_id, player_id) DO UPDATE SET text = EXCLUDED.text',
-        (game['id'], q['id'], pid, text)
+        (game['id'], q['id'], pid, text),
     )
     db().commit()
-
     return jsonify({'ok': True})
 
 
@@ -697,7 +593,6 @@ def api_vote(code):
 
     options = json.loads(q['options_json'] or '[]')
     chosen = next((o for o in options if o['id'] == opt), None)
-
     if not chosen:
         return jsonify({'ok': False, 'message': 'Такого варіанту немає'})
 
@@ -706,10 +601,9 @@ def api_vote(code):
 
     db().execute(
         'INSERT INTO votes(game_id,question_id,player_id,option_id) VALUES(?,?,?,?) ON CONFLICT(question_id, player_id) DO UPDATE SET option_id = EXCLUDED.option_id',
-        (game['id'], q['id'], pid, opt)
+        (game['id'], q['id'], pid, opt),
     )
     db().commit()
-
     return jsonify({'ok': True})
 
 
@@ -754,18 +648,16 @@ def calculate_points(game_id, qid):
     for pid, p in pts.items():
         db().execute(
             'INSERT INTO points(game_id,question_id,player_id,points) VALUES(?,?,?,?) ON CONFLICT(question_id, player_id) DO UPDATE SET points = EXCLUDED.points',
-            (game_id, qid, pid, p)
+            (game_id, qid, pid, p),
         )
         db().execute('UPDATE players SET score=score+? WHERE id=?', (p, pid))
 
     db().commit()
 
 
-
 def pack_state(game, q, public=True):
     ps = [dict(p) for p in players(game['id'])]
     player_id = session.get(f'player_{game["id"]}')
-
     opts = json.loads(q['options_json'] or '[]') if q else []
 
     revealed_ids = []
@@ -776,23 +668,11 @@ def pack_state(game, q, public=True):
 
     if q:
         qid = q['id']
-
-        revealed_rows = db().execute(
-            'SELECT option_id FROM revealed WHERE question_id=?',
-            (qid,)
-        ).fetchall()
-
+        revealed_rows = db().execute('SELECT option_id FROM revealed WHERE question_id=?', (qid,)).fetchall()
         revealed_ids = [r['option_id'] for r in revealed_rows]
 
-        all_votes = db().execute(
-            'SELECT * FROM votes WHERE question_id=?',
-            (qid,)
-        ).fetchall()
-
-        all_answers = db().execute(
-            'SELECT * FROM answers WHERE question_id=?',
-            (qid,)
-        ).fetchall()
+        all_votes = db().execute('SELECT * FROM votes WHERE question_id=?', (qid,)).fetchall()
+        all_answers = db().execute('SELECT * FROM answers WHERE question_id=?', (qid,)).fetchall()
 
         players_by_id = {p['id']: p for p in ps}
         opts_by_id = {o['id']: o for o in opts}
@@ -800,24 +680,17 @@ def pack_state(game, q, public=True):
         for a in all_answers:
             p = players_by_id.get(a['player_id'])
             if p:
-                live_answers.append({
-                    'player': dict(p),
-                    'answer': a['text']
-                })
+                live_answers.append({'player': dict(p), 'answer': a['text']})
 
         for v in all_votes:
             p = players_by_id.get(v['player_id'])
             opt = opts_by_id.get(v['option_id'])
             if p:
-                live_votes.append({
-                    'player': dict(p),
-                    'option_text': opt['text'] if opt else ''
-                })
+                live_votes.append({'player': dict(p), 'option_text': opt['text'] if opt else ''})
 
         for o in opts:
             if o['id'] not in revealed_ids:
                 continue
-
             voters = []
             for v in all_votes:
                 if v['option_id'] == o['id']:
@@ -825,29 +698,17 @@ def pack_state(game, q, public=True):
                     if p:
                         voters.append(dict(p))
 
-            author = None
-
             if o['type'] == 'player':
-                p = players_by_id.get(o.get('player_id'))
-                author = dict(p) if p else None
-
+                author_player = players_by_id.get(o.get('player_id'))
+                author = dict(author_player) if author_player else None
             elif o['type'] == 'fake':
-                author = {
-                    'name': 'Фейк ведучої',
-                    'avatar': game['host_avatar'] or '!'
-                }
-
+                author = {'name': 'Фейк ведучої', 'avatar': game['host_avatar'] or '!'}
             elif o['type'] == 'correct':
-                author = {
-                    'name': 'Правильна відповідь',
-                    'avatar': '✓'
-                }
+                author = {'name': 'Правильна відповідь', 'avatar': '✓'}
+            else:
+                author = None
 
-            revealed.append({
-                **o,
-                'author': author,
-                'voters': voters
-            })
+            revealed.append({**o, 'author': author, 'voters': voters})
 
         points_rows = [
             dict(x)
@@ -858,7 +719,7 @@ def pack_state(game, q, public=True):
                 JOIN players ON players.id = points.player_id
                 WHERE points.question_id=?
                 ''',
-                (qid,)
+                (qid,),
             ).fetchall()
         ]
 
@@ -871,19 +732,14 @@ def pack_state(game, q, public=True):
         'question': dict(q) if q else None,
         'players': ps,
         'options': [
-            {
-                'id': o['id'],
-                'text': o['text'],
-                'type': o.get('type'),
-                'player_id': o.get('player_id')
-            }
+            {'id': o['id'], 'text': o['text'], 'type': o.get('type'), 'player_id': o.get('player_id')}
             for o in opts
         ],
         'revealed': revealed,
         'revealed_ids': revealed_ids,
         'live_answers': live_answers if not public else [],
         'live_votes': live_votes if not public else [],
-        'points': points_rows
+        'points': points_rows,
     }
 
 
