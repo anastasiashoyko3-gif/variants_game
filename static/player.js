@@ -1,5 +1,6 @@
 const box = document.getElementById('playerState');
 let last = null;
+let serverOffset = 0;
 let lastKey = '';
 let poll = null;
 
@@ -13,6 +14,9 @@ async function api(force = false) {
     }
 
     const s = await r.json();
+    if (s.server_now) {
+  serverOffset = s.server_now - Math.floor(Date.now() / 1000);
+}
     last = s;
     render(s, force);
   } catch (e) {
